@@ -8,7 +8,7 @@ st.title("🌊 โมเดลจำลองน้ำท่า HEC-4")
 
 with st.sidebar:
     st.header("⚙️ ตั้งค่าระบบ AI")
-    api_key = st.text_input("ใส่ Gemini API Key", type="password")
+    api_key = st.secrets["GEMINI_API_KEY"]
     st.divider()
     st.header("⚙️ พารามิเตอร์")
     n_years = st.number_input("จำนวนปีที่จำลอง", min_value=1, value=50)
@@ -21,7 +21,7 @@ if api_key:
     if st.button("💡 ให้ AI แนะนำวิธีใช้งานโปรแกรม"):
         with st.spinner("WARI กำลังพิมพ์คำแนะนำ..."):
             try:
-                model_ai = genai.GenerativeModel("gemini-1.5-flash")
+                model_ai = genai.GenerativeModel("gemini-1.5-flash-latest")
                 prompt = "คุณคือ WARI ช่วยเขียนคำแนะนำวิธีใช้โปรแกรม HEC-4 Monthly Streamflow Simulation (มีช่องใส่จำนวนปี, Traces, missing rate และอัปโหลดไฟล์ CSV) ให้วิศวกรเข้าใจง่ายๆ สั้นๆ ไม่เกิน 3 ข้อ"
                 response = model_ai.generate_content(prompt)
                 st.info(response.text)
