@@ -247,3 +247,4 @@ if __name__ == "__main__":
     
     # 2. พล็อตตรวจสอบความสม่ำเสมอของสถานีเป้าหมาย
     # model.plot_double_mass_curve(station="P1")
+    
