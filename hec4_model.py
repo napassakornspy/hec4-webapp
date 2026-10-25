@@ -235,16 +235,3 @@ class HEC4:
              .validate_imputation())
         if self.verbose: print("\n  ✓ HEC-4 Pipeline Completed.")
         return self
-
-# ==========================================
-# 🚀 ตัวอย่างการเรียกใช้งาน
-# ==========================================
-if __name__ == "__main__":
-    # 1. รันโมเดลหลัก
-    # model = HEC4(verbose=True)
-    # model.load_data("example_flows.csv", date_col="Date")
-    # model.run_all(n_years=50, n_traces=10, missing_rate=0.1)
-    
-    # 2. พล็อตตรวจสอบความสม่ำเสมอของสถานีเป้าหมาย
-    # model.plot_double_mass_curve(station="P1")
-    
