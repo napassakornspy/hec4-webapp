@@ -4,3 +4,4 @@ scipy
 scikit-learn
 matplotlib
 google-generativeai>=0.7.2
+
