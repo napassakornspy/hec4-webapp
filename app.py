@@ -17,11 +17,6 @@ with st.sidebar:
 # ปุ่ม AI แนะนำการใช้งาน
 if api_key:
     genai.configure(api_key=api_key)
-    st.write("🔍 โมเดลที่ API Key นี้ใช้งานได้:")
-    for m in genai.list_models():
-        if 'generateContent' in m.supported_generation_methods:
-            st.write(m.name)
-            
     if st.button("💡 ให้ AI แนะนำวิธีใช้งานโปรแกรม"):
         with st.spinner("WARI กำลังพิมพ์คำแนะนำ..."):
             try:
