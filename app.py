@@ -39,41 +39,43 @@ with st.sidebar:
 
 uploaded_file = st.file_uploader("อัปโหลดไฟล์ข้อมูลน้ำท่า (CSV หรือ Excel)", type=["csv", "xlsx"])
 
+# ใส่ _ หน้า _status_box เพื่อส่งผ่านเข้าไปอัปเดตข้อความในฟังก์ชัน Cache
 @st.cache_resource(show_spinner=False)
-def run_hec4_pipeline(file_buffer, years, traces, missing):
+def run_hec4_pipeline(file_buffer, years, traces, missing, _status_box):
     model = HEC4(verbose=False)
+    
+    _status_box.info("📥 Stage 1/5: โหลดและจัดการรูปแบบข้อมูลดิบ...")
     model.load_data(file_buffer, date_col="Date")
+    
+    _status_box.info(f"🔍 Stage 2/5: สร้าง Pseudo-Missing Data (สัดส่วน {missing})...")
     model.generate_pseudo_missing(missing_rate=missing)
+    
+    _status_box.info("✨ Stage 3/5: เติมเต็มข้อมูลแหว่ง (Regression & Mean Infill)...")
     model.infill_missing()
+    
+    _status_box.info("📊 Stage 4/5: คำนวณค่าสถิติและเมทริกซ์ความสัมพันธ์เชิงพื้นที่...")
     model.compute_statistics()
     model.compute_correlation_matrices()
     model.compute_generation_matrices()
+    
+    _status_box.info(f"🎲 Stage 5/5: สุ่มจำลองข้อมูลน้ำท่าสังเคราะห์ {years} ปี {traces} รูปแบบ...")
     model.generate_synthetic(n_years=years, n_traces=traces)
     model.validate_imputation()
+    
     return model
 
 if uploaded_file and st.button("🚀 รันโมเดล"):
-    with st.status("กำลังรันโมเดล HEC-4 ตาม Flowchart...", expanded=True) as status:
-        st.write("📥 1/5 โหลดและจัดการรูปแบบข้อมูลดิบ...")
-        st.write(f"🔍 2/5 สร้าง Pseudo-Missing Data (สัดส่วน {missing_rate})...")
-        st.write("✨ 3/5 เติมเต็มข้อมูลแหว่ง (Regression & Mean Infill)...")
-        st.write("📊 4/5 คำนวณค่าสถิติและเมทริกซ์ความสัมพันธ์เชิงพื้นที่...")
-        st.write(f"🎲 5/5 สุ่มจำลองข้อมูลน้ำท่าสังเคราะห์ {n_years} ปี {n_traces} รูปแบบ...")
-        
-        # รันโมเดลและเก็บลง Session State
-        st.session_state.model_result = run_hec4_pipeline(uploaded_file, n_years, n_traces, missing_rate)
-        st.session_state.model_run_complete = True
-        
-        status.update(label="ประมวลผลเสร็จสิ้น!", state="complete", expanded=False)
+    # กล่องข้อความสลับโชว์ Stage
+    status_box = st.empty()
+    st.session_state.model_result = run_hec4_pipeline(uploaded_file, n_years, n_traces, missing_rate, status_box)
+    st.session_state.model_run_complete = True
+    status_box.success("✅ ประมวลผลเสร็จสิ้นเรียบร้อยแล้ว!")
 
-# แสดงผลและเรียกใช้ WARI เมื่อรันโมเดลเสร็จแล้วเท่านั้น
 if st.session_state.model_run_complete:
     model = st.session_state.model_result
-    st.success("จำลองข้อมูลเรียบร้อยแล้วค่า!")
     st.subheader("📈 ข้อมูลน้ำท่าสังเคราะห์ (Trace 001)")
     st.line_chart(model.synthetic_traces["trace_001"])
 
-    # ย้าย AI มาโชว์วิเคราะห์ผลตอนจบ
     if api_key:
         st.subheader("🧠 ให้ WARI ช่วยวิเคราะห์ผลลัพธ์")
         if st.button("คลิกเพื่อให้ WARI สรุปข้อมูล"):
@@ -81,11 +83,10 @@ if st.session_state.model_run_complete:
                 try:
                     genai.configure(api_key=api_key)
                     model_ai = genai.GenerativeModel("gemini-3.5-flash")
-                    # ดึงสถิติพื้นฐานส่งให้ AI วิเคราะห์
                     trace1_stats = model.synthetic_traces["trace_001"].describe().to_string()
-                    prompt = f"คุณคือ WARI เพศหญิง ผู้ช่วยวิศวกรแหล่งน้ำ/วิศวกรชลประทาน/นักอุทกวิทยา ช่วยวิเคราะห์ผลสถิติของข้อมูลน้ำท่าสังเคราะห์ Trace 1 จากโมเดล HEC-4 ชุดนี้ให้หน่อย สรุปสั้นๆ ให้เห็นแนวโน้ม ค่าสูงสุด/ต่ำสุด หรือจุดที่วิศวกรอุทกวิทยาควรระวังในการออกแบบโครงสร้าง:\n\n{trace1_stats}"
+                    prompt = "คุณคือ WARI เพศหญิง ผู้ช่วยวิศวกรแหล่งน้ำ/วิศวกรชลประทาน/นักอุทกวิทยา ช่วยวิเคราะห์ผลสถิติของข้อมูลน้ำท่าสังเคราะห์ Trace 1 จากโมเดล HEC-4 ชุดนี้ให้หน่อย สรุปสั้นๆ ให้เห็นแนวโน้ม ค่าสูงสุด/ต่ำสุด หรือจุดที่วิศวกรอุทกวิทยาควรระวังในการออกแบบโครงสร้าง:\n\n{trace1_stats}"
                     
                     response = model_ai.generate_content(prompt)
                     st.info(response.text)
                 except Exception as e:
-                    st.error(f"API ดื้อจ้ะ เชื่อมต่อไม่ได้: {e}")
+                    st.error(f"API เชื่อมต่อไม่ได้จ้ะ: {e}")
