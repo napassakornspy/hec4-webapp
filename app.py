@@ -19,7 +19,7 @@ if api_key:
     if st.button("💡 ให้ AI แนะนำวิธีใช้งานโปรแกรม"):
         with st.spinner("WARI กำลังพิมพ์คำแนะนำ..."):
             try:
-                model_ai = genai.GenerativeModel("gemini-1.0-pro")
+                model_ai = genai.GenerativeModel("gemini-1.5-flash")
                 prompt = "คุณคือ WARI ช่วยเขียนคำแนะนำวิธีใช้โปรแกรม HEC-4 Monthly Streamflow Simulation (มีช่องใส่จำนวนปี, Traces, missing rate และอัปโหลดไฟล์ CSV) ให้วิศวกรเข้าใจง่ายๆ สั้นๆ ไม่เกิน 3 ข้อ"
                 response = model_ai.generate_content(prompt)
                 st.info(response.text)
