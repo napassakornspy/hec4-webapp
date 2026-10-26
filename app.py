@@ -66,18 +66,18 @@ if uploaded_file and st.button("🚀 รันโมเดล"):
         
         status.update(label="ประมวลผลเสร็จสิ้น!", state="complete", expanded=False)
 
-# แสดงผลและเรียกใช้ STAR เมื่อรันโมเดลเสร็จแล้วเท่านั้น
+# แสดงผลและเรียกใช้ WARI เมื่อรันโมเดลเสร็จแล้วเท่านั้น
 if st.session_state.model_run_complete:
     model = st.session_state.model_result
-    st.success("จำลองข้อมูลเรียบร้อยแล้วตัว!")
+    st.success("จำลองข้อมูลเรียบร้อยแล้วค่า!")
     st.subheader("📈 ข้อมูลน้ำท่าสังเคราะห์ (Trace 001)")
     st.line_chart(model.synthetic_traces["trace_001"])
 
     # ย้าย AI มาโชว์วิเคราะห์ผลตอนจบ
     if api_key:
-        st.subheader("🧠 ให้ STAR ช่วยวิเคราะห์ผลลัพธ์")
-        if st.button("คลิกเพื่อให้ STAR สรุปข้อมูล"):
-            with st.spinner("เค้ากำลังคำนวณและสรุปผลให้ปายอยู่นะ..."):
+        st.subheader("🧠 ให้ WARI ช่วยวิเคราะห์ผลลัพธ์")
+        if st.button("คลิกเพื่อให้ WARI สรุปข้อมูล"):
+            with st.spinner("เค้ากำลังคำนวณและสรุปผลให้อยู่นะ..."):
                 try:
                     genai.configure(api_key=api_key)
                     model_ai = genai.GenerativeModel("gemini-3.5-flash")
