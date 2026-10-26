@@ -23,14 +23,14 @@ class HEC4:
         self.synthetic_traces = self.stations = self.n_stations = None
 
     def load_data(self, filepath, date_col="Date", flow_cols=None, date_format=None, missing_codes=(-999,-9999)):
-file_name = filepath.name.lower()
-if file_name.endswith('.csv'):
-    df = pd.read_csv(filepath)
-elif file_name.endswith(('.xls', '.xlsx')):
-    df = pd.read_excel(filepath)
-else:
-    raise ValueError("อัปโหลดได้เฉพาะไฟล์ .csv หรือ .xlsx เท่านั้นนะ")
-    raise ValueError("อัปโหลดได้เฉพาะไฟล์ .csv หรือ .xlsx เท่านั้นนะ")
+        file_name = filepath.name.lower()
+        if file_name.endswith('.csv'):
+            df = pd.read_csv(filepath)
+        elif file_name.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(filepath)
+        else:
+            raise ValueError("อัปโหลดได้เฉพาะไฟล์ .csv หรือ .xlsx เท่านั้นนะ")
+
         df[date_col] = pd.to_datetime(df[date_col], format=date_format)
         df = df.set_index(date_col).sort_index()
         if flow_cols: df = df[flow_cols]
