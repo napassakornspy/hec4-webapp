@@ -5,6 +5,7 @@ from hec4_model import HEC4
 
 st.set_page_config(page_title="HEC-4 Web App", layout="wide")
 st.title("🌊 โมเดลจำลองน้ำท่า HEC-4")
+st.write("GenAI Version:", genai.__version__)
 
 with st.sidebar:
     api_key = st.secrets["GEMINI_API_KEY"]
@@ -19,7 +20,7 @@ if api_key:
     if st.button("💡 ให้ AI แนะนำวิธีใช้งานโปรแกรม"):
         with st.spinner("WARI กำลังพิมพ์คำแนะนำ..."):
             try:
-                model_ai = genai.GenerativeModel("gemini-1.5-flash")
+                model_ai = genai.GenerativeModel("gemini-1.5-pro")
                 prompt = "คุณคือ WARI ช่วยเขียนคำแนะนำวิธีใช้โปรแกรม HEC-4 Monthly Streamflow Simulation (มีช่องใส่จำนวนปี, Traces, missing rate และอัปโหลดไฟล์ CSV) ให้วิศวกรเข้าใจง่ายๆ สั้นๆ ไม่เกิน 3 ข้อ"
                 response = model_ai.generate_content(prompt)
                 st.info(response.text)
