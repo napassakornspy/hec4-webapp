@@ -113,6 +113,62 @@ st.subheader("📊 สถิติเชิงพรรณนา (Trace 001)")
         ax.legend()
         
         st.pyplot(fig)
+
+st.divider()
+    st.subheader("🏆 คัดเลือก Trace ที่เหมาะสมที่สุด (Best Representative Trace)")
+    
+    # 1. ให้โปรแกรมคำนวณหา Trace ที่ค่าเฉลี่ยใกล้เคียงข้อมูลในอดีตที่สุด
+    # หาค่าเฉลี่ยรวมของข้อมูลอดีต (หลัง Infill)
+    historical_mean = model.filled_data.mean().mean() 
+    best_trace_name = None
+    min_diff = float('inf')
+    
+    for trace_name, df_trace in model.synthetic_traces.items():
+        trace_mean = df_trace.mean().mean()
+        diff = abs(trace_mean - historical_mean)
+        if diff < min_diff:
+            min_diff = diff
+            best_trace_name = trace_name
+            
+    st.success(f"✨ โปรแกรมคัดเลือก **{best_trace_name}** มาให้แล้วจ้ะ!")
+    st.write(f"เหตุผลเบื้องต้น: มีค่าเฉลี่ยปริมาณน้ำใกล้เคียงกับข้อมูลในอดีตมากที่สุด (ความคลาดเคลื่อนน้อยที่สุด)")
+    
+    # 2. ให้ WARI ช่วยเขียนสรุปเหตุผลทางวิชาการเพื่อนำไปใช้งาน
+    if api_key:
+        if st.button(f"🧠 ให้ WARI สรุปเหตุผลเจาะลึกของ {best_trace_name}"):
+            with st.spinner("เค้ากำลังเรียบเรียงเหตุผลเชิงอุทกวิทยาให้ตัวเองอยู่นะ..."):
+                try:
+                    # ดึงสถิติของ Trace ที่ชนะส่งไปให้ AI
+                    best_trace_stats = model.synthetic_traces[best_trace_name].describe().to_string()
+                    
+                    prompt = f"""
+                    คุณคือ WARI ผู้ช่วยวิจัยระดับปริญญาเอกด้านวิศวกรรมทรัพยากรน้ำ 
+                    โปรแกรม HEC-4 ได้จำลองข้อมูลและคัดเลือก '{best_trace_name}' เป็นตัวแทนที่ดีที่สุดเพียง 1 ไฟล์ 
+                    เนื่องจากมีค่าเฉลี่ยรวมใกล้เคียงกับข้อมูลในอดีตมากที่สุด
+                    
+                    ช่วยเขียนสรุปสั้นๆ (ไม่เกิน 3-4 ย่อหน้า) ด้วยภาษาที่เป็นทางการแต่น่าอ่าน ให้วิศวกรนำไปเขียนลงเล่มวิทยานิพนธ์ได้เลย โดยครอบคลุมประเด็น:
+                    1. ทำไมการเลือก Trace ที่มีคุณสมบัติทางสถิติใกล้เคียงอดีตที่สุด จึงมีความเหมาะสมและปลอดภัยต่อการนำไปใช้ออกแบบโครงสร้างทางน้ำ
+                    2. วิเคราะห์แนวโน้มจากค่าสถิติของ Trace นี้ (อ้างอิงจากตารางด้านล่าง) ว่ามีจุดไหนที่ควรระวังบ้าง
+                    
+                    ตารางสถิติ:
+                    {best_trace_stats}
+                    """
+                    
+                    genai.configure(api_key=api_key)
+                    model_ai = genai.GenerativeModel("gemini-3.5-flash")
+                    response = model_ai.generate_content(prompt)
+                    st.info(response.text)
+                    
+                    # แถมปุ่มโหลดเฉพาะ Trace ที่ดีที่สุดไปเลย
+                    csv_best = model.synthetic_traces[best_trace_name].to_csv().encode('utf-8')
+                    st.download_button(
+                        label=f"📥 ดาวน์โหลดเฉพาะ {best_trace_name} ไปใช้งาน (CSV)",
+                        data=csv_best,
+                        file_name=f"best_{best_trace_name}.csv",
+                        mime="text/csv"
+                    )
+                except Exception as e:
+                    st.error(f"การเชื่อมต่อ API มีปัญหาจ้ะ: {e}")
     if api_key:
         st.subheader("🧠 ให้ WARI ช่วยวิเคราะห์ผลลัพธ์")
         if st.button("คลิกเพื่อให้ WARI สรุปข้อมูล"):
@@ -127,3 +183,5 @@ st.subheader("📊 สถิติเชิงพรรณนา (Trace 001)")
                     st.info(response.text)
                 except Exception as e:
                     st.error(f"API เชื่อมต่อไม่ได้จ้ะ: {e}")
+                    
+                    
