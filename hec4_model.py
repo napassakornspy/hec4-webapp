@@ -209,20 +209,21 @@ class HEC4:
 
     def validate_imputation(self):
         if not hasattr(self, 'pseudo_mask'): return self
-            
+                
         obs = self.original_data.values[self.pseudo_mask]
         sim = self.filled_data.values[self.pseudo_mask]
-        
+            
         valid = ~np.isnan(obs) & ~np.isnan(sim)
         obs_valid, sim_valid = obs[valid], sim[valid]
-        
+            
+        self.rmse, self.nse = None, None  # เพิ่มบรรทัดนี้
         if len(obs_valid) > 0:
-            rmse = np.sqrt(mean_squared_error(obs_valid, sim_valid))
-            nse = 1 - (np.sum((obs_valid - sim_valid)**2) / np.sum((obs_valid - np.mean(obs_valid))**2))
+            self.rmse = np.sqrt(mean_squared_error(obs_valid, sim_valid)) # ใส่ self.
+            self.nse = 1 - (np.sum((obs_valid - sim_valid)**2) / np.sum((obs_valid - np.mean(obs_valid))**2)) # ใส่ self.
             if self.verbose:
                 print("  Validation Results (Pseudo-Missing Test):")
-                print(f"    - RMSE: {rmse:.4f}")
-                print(f"    - NSE:  {nse:.4f}")
+                print(f"    - RMSE: {self.rmse:.4f}")
+                print(f"    - NSE:  {self.nse:.4f}")
         return self
 
     def plot_double_mass_curve(self, station, base_stations=None):
