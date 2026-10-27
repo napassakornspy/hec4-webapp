@@ -3,6 +3,7 @@ import streamlit as st
 import pandas as pd
 import google.generativeai as genai
 from hec4_model import HEC4
+plt.rcParams['font.family'] = 'TH Sarabun New'
 
 st.set_page_config(page_title="HEC-4 Web App", layout="wide")
 st.title("🌊 โมเดลจำลองข้อมูล HEC-4")
