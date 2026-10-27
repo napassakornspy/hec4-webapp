@@ -65,42 +65,55 @@ class HEC4:
         filled = self.log_data.copy()
         n_filled = 0
         
-        for station in self.stations:
-            miss_idx = filled.index[filled[station].isna()]
-            if len(miss_idx) == 0: continue
+        # จัดกลุ่มและประมวลผลเป็นรายเดือนเพื่อลดลูป
+        for m in range(1, 13):
+            m_idx = filled.index[filled.index.month == m]
+            if len(m_idx) == 0: continue
             
-            for t in miss_idx:
-                m = t.month
-                best_r2 = -np.inf; best_pred = None; best_ab = (0.0, 0.0)
+            data_m = filled.loc[m_idx]
+            # คำนวณเมทริกซ์ความสัมพันธ์ล่วงหน้าทั้งเดือน เร็วกว่าจับคู่ทีละสถานี
+            corr_m = data_m.corr(min_periods=self.min_concurrent)
+            
+            for station in self.stations:
+                miss_idx = data_m.index[data_m[station].isna()]
+                if len(miss_idx) == 0: continue
                 
-                for predictor in self.stations:
-                    if predictor == station or pd.isna(filled.at[t, predictor]): continue
+                # เรียงลำดับตัวแปรต้น (Predictors) ที่มีแนวโน้มความสัมพันธ์สูงสุด
+                corrs = corr_m[station].drop(station).dropna().sort_values(ascending=False)
+                
+                for t in miss_idx:
+                    best_r2 = -np.inf; best_pred = None; best_ab = (0.0, 0.0)
                     
-                    same_m = filled.index.month == m
-                    y = filled.loc[same_m, station]; x = filled.loc[same_m, predictor]
-                    valid = y.notna() & x.notna()
-                    if valid.sum() < self.min_concurrent: continue
+                    # คัดมาเฉพาะตัวแปรต้นที่มีข้อมูล ณ เวลา t
+                    available_preds = corrs.index[filled.loc[t, corrs.index].notna()]
                     
-                    slope, intercept, r, _, _ = stats.linregress(x[valid].values, y[valid].values)
-                    r2 = r**2
-                    
-                    if r2 > best_r2 and np.isfinite(slope) and (-0.5 <= slope <= 1.5):
-                        best_r2 = r2
-                        best_pred = predictor
-                        best_ab = (slope, intercept)
+                    for pred in available_preds:
+                        valid = data_m[station].notna() & data_m[pred].notna()
+                        if valid.sum() < self.min_concurrent: continue
                         
-                if best_pred is not None:
-                    filled.at[t, station] = best_ab[1] + best_ab[0] * filled.at[t, best_pred]
-                    n_filled += 1
-                else:
-                    mu = filled.loc[filled.index.month == m, station].dropna().mean()
-                    if np.isfinite(mu): 
-                        filled.at[t, station] = mu
+                        y = data_m.loc[valid, station].values
+                        x = data_m.loc[valid, pred].values
+                        
+                        # ใช้ NumPy polyfit เร็วกว่า stats.linregress ระดับ C-level
+                        slope, intercept = np.polyfit(x, y, 1)
+                        r2 = np.corrcoef(x, y)[0, 1]**2
+                        
+                        if r2 > best_r2 and (-0.5 <= slope <= 1.5):
+                            best_r2 = r2; best_pred = pred; best_ab = (slope, intercept)
+                            break # เจอตัวที่ดีที่สุดตามเงื่อนไขแล้ว หยุดลูปย่อยทันที
+                            
+                    if best_pred is not None:
+                        filled.at[t, station] = best_ab[1] + best_ab[0] * filled.at[t, best_pred]
                         n_filled += 1
-                        
+                    else:
+                        mu = data_m[station].mean()
+                        if np.isfinite(mu): 
+                            filled.at[t, station] = mu
+                            n_filled += 1
+                            
         self.filled_log = filled
         self.filled_data = (np.exp(filled) - self.epsilon).clip(lower=0.0)
-        if self.verbose: print(f"  ✓ เติมข้อมูลสำเร็จ: {n_filled} จุด (ผ่านเกณฑ์ Beta -0.5 ถึง 1.5)")
+        if self.verbose: print(f"  ✓ เติมข้อมูลสำเร็จ (Optimized): {n_filled} จุด")
         return self
 
     def compute_statistics(self):
