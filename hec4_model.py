@@ -1,17 +1,15 @@
 import warnings
 import numpy as np
 import pandas as pd
-from pathlib import Path
-from scipy import stats, linalg
+from scipy import linalg
 from sklearn.metrics import mean_squared_error
 import matplotlib.pyplot as plt
 
 warnings.filterwarnings("ignore")
-MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
 
 class HEC4:
     """
-    HEC-4 Monthly Streamflow Simulation (Python implementation)
+    HEC-4 Monthly Streamflow/Rainfall Simulation (Python implementation)
     Full Pipeline: Pseudo-Missing, Beta Validation, RMSE/NSE & DMA
     """
     def __init__(self, epsilon=0.001, min_concurrent=10, verbose=True):
@@ -20,7 +18,9 @@ class HEC4:
         self.verbose = verbose
         self.data = self.log_data = self.filled_log = self.filled_data = None
         self.monthly_stats = self.M0 = self.M1 = self.A = self.B = None
-        self.synthetic_traces = self.stations = self.n_stations = None
+        self.synthetic_traces = {}
+        self.stations = []
+        self.n_stations = 0
 
     def load_data(self, filepath, date_col="Date", flow_cols=None, date_format=None, missing_codes=(-999,-9999)):
         file_name = filepath.name.lower()
@@ -43,7 +43,7 @@ class HEC4:
         
         if self.verbose:
             print("="*60)
-            print("  HEC-4 Monthly Streamflow Simulation — Full Upgraded Pipeline")
+            print("  HEC-4 Monthly Simulation — Full Upgraded Pipeline")
             print("="*60)
             print(f"  Stations : {self.n_stations}  →  {self.stations}")
         return self
@@ -180,35 +180,32 @@ class HEC4:
         return self
 
     def generate_synthetic(self, n_years=50, n_traces=1, seed=None, cap_multiplier=1.5):
-            rng = np.random.default_rng(seed)
-            warmup = 24
-            self.synthetic_traces = {}
-            
-            # ดึงค่าสูงสุดจากข้อมูลอดีตมาเป็นเพดานจำกัดการแกว่งตัว
-            max_limits = self.filled_data.max().values * cap_multiplier
-            # ... (โค้ดส่วนที่เหลือด้านในปล่อยย่อหน้าไว้เหมือนเดิมได้เลยจ้ะ)
-            
-            for tr in range(1, n_traces + 1):
-                Z_prev = np.zeros(self.n_stations)
-                records = []
-                for t in range(n_years*12 + warmup):
-                    m = (t % 12) + 1
-                    Z = self.A[m] @ Z_prev + self.B[m] @ rng.standard_normal(self.n_stations)
-                        
-                    log_Q = [self.monthly_stats[self.stations[i]][m]["mean_log"] + 
-                            self.monthly_stats[self.stations[i]][m]["std_log"] * Z[i] for i in range(self.n_stations)]
-                        
-                    # แปลงค่ากลับ จำกัดไม่ให้ต่ำกว่า 0 และไม่ให้เกินเพดานสูงสุด
-                    Q_raw = np.exp(log_Q) - self.epsilon
-                    Q_capped = np.clip(Q_raw, 0.0, max_limits)
-                        
-                    records.append(Q_capped)
-                    Z_prev = Z
-                        
-                    start_yr = self.data.index[0].year if self.data is not None else 2000
-                    idx = pd.date_range(f"{start_yr}-01-01", periods=(n_years*12)+warmup, freq="MS")
-                    self.synthetic_traces[f"trace_{tr:03d}"] = pd.DataFrame(records, index=idx, columns=self.stations).iloc[warmup:]
-            return self
+        rng = np.random.default_rng(seed)
+        warmup = 24
+        self.synthetic_traces = {}
+        
+        max_limits = self.filled_data.max().values * cap_multiplier
+        
+        for tr in range(1, n_traces + 1):
+            Z_prev = np.zeros(self.n_stations)
+            records = []
+            for t in range(n_years*12 + warmup):
+                m = (t % 12) + 1
+                Z = self.A[m] @ Z_prev + self.B[m] @ rng.standard_normal(self.n_stations)
+                
+                log_Q = [self.monthly_stats[self.stations[i]][m]["mean_log"] + 
+                         self.monthly_stats[self.stations[i]][m]["std_log"] * Z[i] for i in range(self.n_stations)]
+                
+                Q_raw = np.exp(log_Q) - self.epsilon
+                Q_capped = np.clip(Q_raw, 0.0, max_limits)
+                
+                records.append(Q_capped)
+                Z_prev = Z
+                
+            start_yr = self.data.index[0].year if self.data is not None else 2000
+            idx = pd.date_range(f"{start_yr}-01-01", periods=(n_years*12)+warmup, freq="MS")
+            self.synthetic_traces[f"trace_{tr:03d}"] = pd.DataFrame(records, index=idx, columns=self.stations).iloc[warmup:]
+        return self
 
     def validate_imputation(self):
         if not hasattr(self, 'pseudo_mask'): return self
@@ -243,8 +240,8 @@ class HEC4:
         ax.plot(base_cumsum, target_cumsum, marker='o', markersize=3, linestyle='-', color='teal', label='Double Mass Curve')
         
         ax.set_title(f"Double Mass Analysis: {station} vs Average of {len(base_stations)} Stations", fontsize=12)
-        ax.set_xlabel("Cumulative Mean of Base Stations (m³/s)")
-        ax.set_ylabel(f"Cumulative Flow at {station} (m³/s)")
+        ax.set_xlabel("Cumulative Mean of Base Stations")
+        ax.set_ylabel(f"Cumulative Flow at {station}")
         ax.grid(True, linestyle='--', alpha=0.6)
         ax.legend()
         plt.tight_layout()
@@ -255,7 +252,7 @@ class HEC4:
         (self.generate_pseudo_missing(missing_rate=missing_rate, seed=seed)
              .infill_missing().compute_statistics()
              .compute_correlation_matrices().compute_generation_matrices()
-             .generate_synthetic(n_years=n_years, n_traces=n_traces, seed=seed)
+             .generate_synthetic(n_years=n_years, n_traces=n_traces, seed=seed, cap_multiplier=1.5)
              .validate_imputation())
         if self.verbose: print("\n  ✓ HEC-4 Pipeline Completed.")
         return self
