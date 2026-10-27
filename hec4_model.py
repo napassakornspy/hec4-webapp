@@ -65,26 +65,22 @@ class HEC4:
         filled = self.log_data.copy()
         n_filled = 0
         
-        # จัดกลุ่มและประมวลผลเป็นรายเดือนเพื่อลดลูป
         for m in range(1, 13):
             m_idx = filled.index[filled.index.month == m]
             if len(m_idx) == 0: continue
             
             data_m = filled.loc[m_idx]
-            # คำนวณเมทริกซ์ความสัมพันธ์ล่วงหน้าทั้งเดือน เร็วกว่าจับคู่ทีละสถานี
             corr_m = data_m.corr(min_periods=self.min_concurrent)
             
             for station in self.stations:
                 miss_idx = data_m.index[data_m[station].isna()]
                 if len(miss_idx) == 0: continue
                 
-                # เรียงลำดับตัวแปรต้น (Predictors) ที่มีแนวโน้มความสัมพันธ์สูงสุด
                 corrs = corr_m[station].drop(station).dropna().sort_values(ascending=False)
                 
                 for t in miss_idx:
                     best_r2 = -np.inf; best_pred = None; best_ab = (0.0, 0.0)
                     
-                    # คัดมาเฉพาะตัวแปรต้นที่มีข้อมูล ณ เวลา t
                     available_preds = corrs.index[filled.loc[t, corrs.index].notna()]
                     
                     for pred in available_preds:
@@ -94,13 +90,12 @@ class HEC4:
                         y = data_m.loc[valid, station].values
                         x = data_m.loc[valid, pred].values
                         
-                        # ใช้ NumPy polyfit เร็วกว่า stats.linregress ระดับ C-level
                         slope, intercept = np.polyfit(x, y, 1)
                         r2 = np.corrcoef(x, y)[0, 1]**2
                         
                         if r2 > best_r2 and (-0.5 <= slope <= 1.5):
                             best_r2 = r2; best_pred = pred; best_ab = (slope, intercept)
-                            break # เจอตัวที่ดีที่สุดตามเงื่อนไขแล้ว หยุดลูปย่อยทันที
+                            break 
                             
                     if best_pred is not None:
                         filled.at[t, station] = best_ab[1] + best_ab[0] * filled.at[t, best_pred]
@@ -184,12 +179,17 @@ class HEC4:
             self.A[m] = A; self.B[m] = B
         return self
 
-    def generate_synthetic(self, n_years=50, n_traces=1, seed=None):
-        rng = np.random.default_rng(seed); warmup = 24
+    def generate_synthetic(self, n_years=50, n_traces=1, seed=None, cap_multiplier=3.0):
+        rng = np.random.default_rng(seed)
+        warmup = 24
         self.synthetic_traces = {}
         
+        # ดึงค่าสูงสุดจากข้อมูลอดีตมาเป็นเพดานจำกัดการแกว่งตัว
+        max_limits = self.filled_data.max().values * cap_multiplier
+        
         for tr in range(1, n_traces + 1):
-            Z_prev = np.zeros(self.n_stations); records = []
+            Z_prev = np.zeros(self.n_stations)
+            records = []
             for t in range(n_years*12 + warmup):
                 m = (t % 12) + 1
                 Z = self.A[m] @ Z_prev + self.B[m] @ rng.standard_normal(self.n_stations)
@@ -197,7 +197,11 @@ class HEC4:
                 log_Q = [self.monthly_stats[self.stations[i]][m]["mean_log"] + 
                          self.monthly_stats[self.stations[i]][m]["std_log"] * Z[i] for i in range(self.n_stations)]
                 
-                records.append(np.maximum(np.exp(log_Q) - self.epsilon, 0.0))
+                # แปลงค่ากลับ จำกัดไม่ให้ต่ำกว่า 0 และไม่ให้เกินเพดานสูงสุด
+                Q_raw = np.exp(log_Q) - self.epsilon
+                Q_capped = np.clip(Q_raw, 0.0, max_limits)
+                
+                records.append(Q_capped)
                 Z_prev = Z
                 
             start_yr = self.data.index[0].year if self.data is not None else 2000
