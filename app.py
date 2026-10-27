@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
@@ -75,7 +76,43 @@ if st.session_state.model_run_complete:
     model = st.session_state.model_result
     st.subheader("📈 ข้อมูลน้ำท่าสังเคราะห์ (Trace 001)")
     st.line_chart(model.synthetic_traces["trace_001"])
+    # แปลงข้อมูล Trace 001 เป็น CSV
+    csv_data = model.synthetic_traces["trace_001"].to_csv().encode('utf-8')
+    
+    # สร้างปุ่มดาวน์โหลด
+    st.download_button(
+        label="📥 ดาวน์โหลดข้อมูล Trace 001 (CSV)",
+        data=csv_data,
+        file_name="synthetic_trace_001.csv",
+        mime="text/csv"
+    )
+st.subheader("📊 สถิติเชิงพรรณนา (Trace 001)")
+    # แสดงตารางสถิติ (Mean, Std, Min, Max ฯลฯ) ของทุกสถานี
+    st.dataframe(model.synthetic_traces["trace_001"].describe())
 
+    st.subheader("⚖️ Double Mass Analysis")
+    st.write("ตรวจสอบความสม่ำเสมอของข้อมูล (Consistency) เทียบกับค่าเฉลี่ยสถานีรอบข้าง")
+    
+    # สร้าง Dropdown ให้เลือกสถานีเป้าหมาย
+    target_station = st.selectbox("เลือกสถานีที่ต้องการตรวจสอบ:", model.stations)
+    
+    if target_station:
+        # คำนวณค่าสะสม (Cumulative) สำหรับวาดกราฟ
+        base_stations = [s for s in model.stations if s != target_station]
+        target_cumsum = model.filled_data[target_station].cumsum()
+        base_avg = model.filled_data[base_stations].mean(axis=1)
+        base_cumsum = base_avg.cumsum()
+        
+        # สร้างกราฟและโยนขึ้น Streamlit
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.plot(base_cumsum, target_cumsum, marker='o', markersize=4, linestyle='-', color='#1f77b4', label='Double Mass Curve')
+        ax.set_title(f"{target_station} vs Average of {len(base_stations)} Base Stations", fontsize=12)
+        ax.set_xlabel("Cumulative Mean of Base Stations")
+        ax.set_ylabel(f"Cumulative Flow at {target_station}")
+        ax.grid(True, linestyle='--', alpha=0.6)
+        ax.legend()
+        
+        st.pyplot(fig)
     if api_key:
         st.subheader("🧠 ให้ WARI ช่วยวิเคราะห์ผลลัพธ์")
         if st.button("คลิกเพื่อให้ WARI สรุปข้อมูล"):
