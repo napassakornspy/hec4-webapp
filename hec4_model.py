@@ -180,29 +180,29 @@ class HEC4:
         return self
 
 def generate_synthetic(self, n_years=50, n_traces=1, seed=None, cap_multiplier=1.5):
-        rng = np.random.default_rng(seed)
-        warmup = 24
-        self.synthetic_traces = {}
+    rng = np.random.default_rng(seed)
+    warmup = 24
+    self.synthetic_traces = {}
         
-        # ดึงค่าสูงสุดจากข้อมูลอดีตมาเป็นเพดานจำกัดการแกว่งตัว
-        max_limits = self.filled_data.max().values * cap_multiplier
+    # ดึงค่าสูงสุดจากข้อมูลอดีตมาเป็นเพดานจำกัดการแกว่งตัว
+    max_limits = self.filled_data.max().values * cap_multiplier
         
-        for tr in range(1, n_traces + 1):
-            Z_prev = np.zeros(self.n_stations)
-            records = []
-            for t in range(n_years*12 + warmup):
-                m = (t % 12) + 1
-                Z = self.A[m] @ Z_prev + self.B[m] @ rng.standard_normal(self.n_stations)
+    for tr in range(1, n_traces + 1):
+        Z_prev = np.zeros(self.n_stations)
+        records = []
+        for t in range(n_years*12 + warmup):
+            m = (t % 12) + 1
+            Z = self.A[m] @ Z_prev + self.B[m] @ rng.standard_normal(self.n_stations)
                 
-                log_Q = [self.monthly_stats[self.stations[i]][m]["mean_log"] + 
-                         self.monthly_stats[self.stations[i]][m]["std_log"] * Z[i] for i in range(self.n_stations)]
+            log_Q = [self.monthly_stats[self.stations[i]][m]["mean_log"] + 
+                    self.monthly_stats[self.stations[i]][m]["std_log"] * Z[i] for i in range(self.n_stations)]
                 
-                # แปลงค่ากลับ จำกัดไม่ให้ต่ำกว่า 0 และไม่ให้เกินเพดานสูงสุด
-                Q_raw = np.exp(log_Q) - self.epsilon
-                Q_capped = np.clip(Q_raw, 0.0, max_limits)
+            # แปลงค่ากลับ จำกัดไม่ให้ต่ำกว่า 0 และไม่ให้เกินเพดานสูงสุด
+            Q_raw = np.exp(log_Q) - self.epsilon
+            Q_capped = np.clip(Q_raw, 0.0, max_limits)
                 
-                records.append(Q_capped)
-                Z_prev = Z
+            records.append(Q_capped)
+            Z_prev = Z
                 
             start_yr = self.data.index[0].year if self.data is not None else 2000
             idx = pd.date_range(f"{start_yr}-01-01", periods=(n_years*12)+warmup, freq="MS")
