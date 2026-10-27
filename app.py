@@ -36,7 +36,7 @@ with st.sidebar:
     missing_rate = st.slider("สัดส่วนจำลองข้อมูลแหว่ง", 0.0, 0.5, 0.1)
     
     if not api_key:
-        st.warning("ใส่ API Key ใน Settings ก่อนนะคะ เค้าถึงจะช่วยวิเคราะห์ตอนท้ายได้")
+        st.warning("ใส่ API Key ใน Settings ก่อนนะคะ WARI ถึงจะช่วยวิเคราะห์ตอนท้ายได้")
 
 uploaded_file = st.file_uploader("อัปโหลดไฟล์ข้อมูลน้ำท่า (CSV หรือ Excel)", type=["csv", "xlsx"])
 
@@ -72,10 +72,13 @@ if uploaded_file and st.button("🚀 รันโมเดล"):
     st.session_state.model_run_complete = True
     status_box.success("✅ ประมวลผลเสร็จสิ้นเรียบร้อยแล้ว!")
 
+# --- โค้ดส่วนนี้จะแสดงผลก็ต่อเมื่อรันโมเดลเสร็จแล้วเท่านั้น ---
 if st.session_state.model_run_complete:
     model = st.session_state.model_result
+    
     st.subheader("📈 ข้อมูลน้ำท่าสังเคราะห์ (Trace 001)")
     st.line_chart(model.synthetic_traces["trace_001"])
+    
     # แปลงข้อมูล Trace 001 เป็น CSV
     csv_data = model.synthetic_traces["trace_001"].to_csv().encode('utf-8')
     
@@ -86,7 +89,8 @@ if st.session_state.model_run_complete:
         file_name="synthetic_trace_001.csv",
         mime="text/csv"
     )
-st.subheader("📊 สถิติเชิงพรรณนา (Trace 001)")
+    
+    st.subheader("📊 สถิติเชิงพรรณนา (Trace 001)")
     # แสดงตารางสถิติ (Mean, Std, Min, Max ฯลฯ) ของทุกสถานี
     st.dataframe(model.synthetic_traces["trace_001"].describe())
 
@@ -111,14 +115,12 @@ st.subheader("📊 สถิติเชิงพรรณนา (Trace 001)")
         ax.set_ylabel(f"Cumulative Flow at {target_station}")
         ax.grid(True, linestyle='--', alpha=0.6)
         ax.legend()
-        
         st.pyplot(fig)
 
-st.divider()
+    st.divider()
     st.subheader("🏆 คัดเลือก Trace ที่เหมาะสมที่สุด (Best Representative Trace)")
     
     # 1. ให้โปรแกรมคำนวณหา Trace ที่ค่าเฉลี่ยใกล้เคียงข้อมูลในอดีตที่สุด
-    # หาค่าเฉลี่ยรวมของข้อมูลอดีต (หลัง Infill)
     historical_mean = model.filled_data.mean().mean() 
     best_trace_name = None
     min_diff = float('inf')
@@ -136,13 +138,13 @@ st.divider()
     # 2. ให้ WARI ช่วยเขียนสรุปเหตุผลทางวิชาการเพื่อนำไปใช้งาน
     if api_key:
         if st.button(f"🧠 ให้ WARI สรุปเหตุผลเจาะลึกของ {best_trace_name}"):
-            with st.spinner("เค้ากำลังเรียบเรียงเหตุผลเชิงอุทกวิทยาให้ตัวเองอยู่นะ..."):
+            with st.spinner("WARI กำลังเรียบเรียงเหตุผลเชิงอุทกวิทยาให้นะคะ..."):
                 try:
                     # ดึงสถิติของ Trace ที่ชนะส่งไปให้ AI
                     best_trace_stats = model.synthetic_traces[best_trace_name].describe().to_string()
                     
                     prompt = f"""
-                    คุณคือ WARI ผู้ช่วยวิจัยระดับปริญญาเอกด้านวิศวกรรมทรัพยากรน้ำ 
+                    คุณคือ WARI เพศหญิง ผู้ช่วยวิจัยระดับปริญญาเอกด้านวิศวกรรมทรัพยากรน้ำ 
                     โปรแกรม HEC-4 ได้จำลองข้อมูลและคัดเลือก '{best_trace_name}' เป็นตัวแทนที่ดีที่สุดเพียง 1 ไฟล์ 
                     เนื่องจากมีค่าเฉลี่ยรวมใกล้เคียงกับข้อมูลในอดีตมากที่สุด
                     
@@ -168,20 +170,4 @@ st.divider()
                         mime="text/csv"
                     )
                 except Exception as e:
-                    st.error(f"การเชื่อมต่อ API มีปัญหาจ้ะ: {e}")
-    if api_key:
-        st.subheader("🧠 ให้ WARI ช่วยวิเคราะห์ผลลัพธ์")
-        if st.button("คลิกเพื่อให้ WARI สรุปข้อมูล"):
-            with st.spinner("เค้ากำลังคำนวณและสรุปผลให้อยู่นะ..."):
-                try:
-                    genai.configure(api_key=api_key)
-                    model_ai = genai.GenerativeModel("gemini-3.5-flash")
-                    trace1_stats = model.synthetic_traces["trace_001"].describe().to_string()
-                    prompt = "คุณคือ WARI เพศหญิง ผู้ช่วยวิศวกรแหล่งน้ำ/วิศวกรชลประทาน/นักอุทกวิทยา ช่วยวิเคราะห์ผลสถิติของข้อมูลน้ำท่าสังเคราะห์ Trace 1 จากโมเดล HEC-4 ชุดนี้ให้หน่อย สรุปสั้นๆ ให้เห็นแนวโน้ม ค่าสูงสุด/ต่ำสุด หรือจุดที่วิศวกรอุทกวิทยาควรระวังในการออกแบบโครงสร้าง:\n\n{trace1_stats}"
-                    
-                    response = model_ai.generate_content(prompt)
-                    st.info(response.text)
-                except Exception as e:
-                    st.error(f"API เชื่อมต่อไม่ได้จ้ะ: {e}")
-                    
-                    
+                    st.error(f"การเชื่อมต่อ API มีปัญหา: {e}")
