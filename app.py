@@ -87,7 +87,15 @@ if st.session_state.model_run_complete:
     
     st.subheader(f"📊 สถิติเชิงพรรณนา ({best_trace_name})")
     st.dataframe(model.synthetic_traces[best_trace_name].describe())
-
+    st.subheader("🎯 ประสิทธิภาพการต่อเติมข้อมูล (Data Imputation Validation)")
+    if hasattr(model, 'rmse') and model.rmse is not None:
+        col1, col2, col3 = st.columns(3)
+        col1.metric("RMSE (คลาดเคลื่อนเฉลี่ย)", f"{model.rmse:.2f}")
+        col2.metric("NSE (ประสิทธิภาพสมการ)", f"{model.nse:.2f}")
+        st.write("*หมายเหตุ: ประเมินจากการสุ่มเจาะรูข้อมูลจริง (Pseudo-Missing) และทดสอบเติมกลับด้วยสมการ Regression*")
+    else:
+        st.info("ไม่พบข้อมูลแหว่งจำลอง จึงไม่มีผลการทดสอบความแม่นยำจ้ะ")
+    
     st.subheader("⚖️ Double Mass Analysis")
     st.write("ตรวจสอบความสม่ำเสมอของข้อมูล (Consistency) เทียบกับค่าเฉลี่ยสถานีรอบข้าง")
     
