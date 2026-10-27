@@ -121,7 +121,7 @@ if st.session_state.model_run_complete:
             min_diff = diff
             best_trace_name = trace_name
             
-  st.success(f"✨ โปรแกรมคัดเลือก **{best_trace_name}** มาให้แล้วจ้ะ!")
+    st.success(f"✨ โปรแกรมคัดเลือก **{best_trace_name}** มาให้แล้วจ้ะ!")
     st.write(f"เหตุผลเบื้องต้น: มีค่าเฉลี่ยปริมาณ{data_type}ใกล้เคียงกับข้อมูลในอดีตมากที่สุด")
     
     # 1. ย้ายปุ่มดาวน์โหลดออกมาวางข้างนอก เพื่อไม่ให้ Streamlit รวน
