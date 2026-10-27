@@ -121,38 +121,29 @@ if st.session_state.model_run_complete:
             min_diff = diff
             best_trace_name = trace_name
             
-    st.success(f"✨ โปรแกรมคัดเลือก **{best_trace_name}** มาให้แล้วจ้ะ!")
-    st.write(f"เหตุผลเบื้องต้น: มีค่าเฉลี่ยปริมาณ{data_type}ใกล้เคียงกับข้อมูลในอดีตมากที่สุด (ความคลาดเคลื่อนน้อยที่สุด)")
+  st.success(f"✨ โปรแกรมคัดเลือก **{best_trace_name}** มาให้แล้วจ้ะ!")
+    st.write(f"เหตุผลเบื้องต้น: มีค่าเฉลี่ยปริมาณ{data_type}ใกล้เคียงกับข้อมูลในอดีตมากที่สุด")
     
+    # 1. ย้ายปุ่มดาวน์โหลดออกมาวางข้างนอก เพื่อไม่ให้ Streamlit รวน
+    csv_best = model.synthetic_traces[best_trace_name].to_csv().encode('utf-8')
+    st.download_button(
+        label=f"📥 ดาวน์โหลดเฉพาะ {best_trace_name} ไปใช้งาน (CSV)",
+        data=csv_best,
+        file_name=f"best_{best_trace_name}.csv",
+        mime="text/csv"
+    )
+    
+    # 2. ปุ่มให้ WARI วิเคราะห์ผลแยกไว้ต่างหาก
     if api_key:
         if st.button(f"🧠 ให้ WARI สรุปเหตุผลเจาะลึกของ {best_trace_name}"):
             with st.spinner("WARI กำลังเรียบเรียงเหตุผลให้นะคะ..."):
                 try:
                     best_trace_stats = model.synthetic_traces[best_trace_name].describe().to_string()
-                    
-                    prompt = f"""
-                    คุณคือ WARI เพศหญิง ผู้ช่วยวิศวกรและนักอุทกวิทยา 
-                    โปรแกรมได้จำลองข้อมูลและคัดเลือก '{best_trace_name}' เป็นตัวแทนที่ดีที่สุด เนื่องจากมีค่าเฉลี่ยรวมใกล้เคียงกับข้อมูล{data_type}ในอดีตมากที่สุด
-                    
-                    ช่วยเขียนสรุปสั้นๆ (ไม่เกิน 3-4 ย่อหน้า) ด้วยภาษาทางการแต่น่าอ่าน สำหรับนำไปใช้เขียนรายงานศึกษาด้านอุตุ-อุทกวิทยา โดยครอบคลุมประเด็น:
-                    1. ทำไมการเลือก Trace ที่มีคุณสมบัติทางสถิติใกล้เคียงอดีตที่สุด จึงเหมาะสมต่อการนำไปใช้งาน
-                    2. วิเคราะห์แนวโน้มจากค่าสถิติของ Trace นี้ (อ้างอิงจากตารางด้านล่าง) ว่ามีจุดไหนที่ควรระวังบ้าง โดยพิจารณาบริบทของข้อมูลประเภท '{data_type}'
-                    
-                    ตารางสถิติ:
-                    {best_trace_stats}
-                    """
+                    # (ใส่โค้ด Prompt พิมพ์ prompt = f"""...""" และโค้ดเรียก AI เหมือนเดิมเลยจ้ะ)
                     
                     genai.configure(api_key=api_key)
                     model_ai = genai.GenerativeModel("gemini-3.5-flash")
                     response = model_ai.generate_content(prompt)
                     st.info(response.text)
-                    
-                    csv_best = model.synthetic_traces[best_trace_name].to_csv().encode('utf-8')
-                    st.download_button(
-                        label=f"📥 ดาวน์โหลดเฉพาะ {best_trace_name} ไปใช้งาน (CSV)",
-                        data=csv_best,
-                        file_name=f"best_{best_trace_name}.csv",
-                        mime="text/csv"
-                    )
                 except Exception as e:
                     st.error(f"การเชื่อมต่อ API มีปัญหา: {e}")
