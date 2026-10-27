@@ -10,12 +10,12 @@ st.title("🌊 โมเดลจำลองข้อมูล HEC-4")
 with st.expander("💡 คำแนะนำการเตรียมข้อมูลและตั้งค่าพารามิเตอร์ (คลิกเพื่ออ่าน)"):
     st.markdown("""
     **1. การเตรียมข้อมูล (CSV หรือ Excel)**
-    * **คอลัมน์วันที่ (Date):** กำหนดคอลัมน์แรกให้เป็นวันที่ของข้อมูลรายเดือน (เช่น 2000-01-01) และตั้งชื่อหัวคอลัมน์ว่า "Date"
-    * **คอลัมน์สถานี (Stations):** ถัดจากคอลัมน์วันที่ ให้จัด 1 คอลัมน์ต่อ 1 สถานีวัดน้ำ โดยใช้ชื่อสถานีเป็นหัวคอลัมน์
-    * **รหัสข้อมูลที่ขาดหาย (Missing Codes):** สามารถใส่ค่าว่าง (NaN) หรือใช้ตัวเลขรหัส เช่น -999 หรือ -9999 โค้ดจะจัดการเติมข้อมูลอัตโนมัติให้
+    * **คอลัมน์วันที่ (Date):** กำหนดคอลัมน์แรกให้เป็นวันที่ (เช่น 2000-01-01) และตั้งชื่อหัวคอลัมน์ว่า "Date"
+    * **คอลัมน์สถานี (Stations):** จัด 1 คอลัมน์ต่อ 1 สถานีวัดน้ำ โดยใช้ชื่อสถานีเป็นหัวคอลัมน์
+    * **รหัสข้อมูลที่ขาดหาย:** สามารถใส่ค่าว่าง (NaN) หรือใช้ -999, -9999 โค้ดจะจัดการเติมให้อัตโนมัติ
 
     **2. การตั้งค่าพารามิเตอร์**
-    * **ประเภทข้อมูล:** เลือกว่าข้อมูลที่นำเข้าคือน้ำฝนหรือน้ำท่า เพื่อให้การวิเคราะห์และหน่วยถูกต้อง
+    * **ประเภทข้อมูล:** เลือกว่าข้อมูลที่นำเข้าคือน้ำฝนหรือน้ำท่า
     * **จำนวนปีที่จำลอง:** ความยาวของข้อมูลสังเคราะห์อนาคต
     * **จำนวนรูปแบบ (Traces):** จำนวนชุดข้อมูลจำลองที่เกิดจากการสุ่ม (Monte Carlo)
     * **สัดส่วนจำลองข้อมูลแหว่ง (Missing Rate):** เปอร์เซ็นต์ข้อมูลจริงที่จะจำลองว่าสูญหายเพื่อทดสอบความแม่นยำ
@@ -39,28 +39,23 @@ with st.sidebar:
 
 uploaded_file = st.file_uploader(f"อัปโหลดไฟล์ข้อมูล{data_type} (CSV หรือ Excel)", type=["csv", "xlsx"])
 
-#@st.cache_resource(show_spinner=False)
+# คอมเมนต์ @st.cache_resource ทิ้งไว้ก่อนเพื่อกัน Error UI
+# @st.cache_resource(show_spinner=False)
 def run_hec4_pipeline(file_buffer, years, traces, missing, _status_box):
     model = HEC4(verbose=False)
-    
     _status_box.info("📥 Stage 1/5: โหลดและจัดการรูปแบบข้อมูลดิบ...")
     model.load_data(file_buffer, date_col="Date")
-    
     _status_box.info(f"🔍 Stage 2/5: สร้าง Pseudo-Missing Data (สัดส่วน {missing})...")
     model.generate_pseudo_missing(missing_rate=missing)
-    
     _status_box.info("✨ Stage 3/5: เติมเต็มข้อมูลแหว่ง (Regression & Mean Infill)...")
     model.infill_missing()
-    
     _status_box.info("📊 Stage 4/5: คำนวณค่าสถิติและเมทริกซ์ความสัมพันธ์เชิงพื้นที่...")
     model.compute_statistics()
     model.compute_correlation_matrices()
     model.compute_generation_matrices()
-    
     _status_box.info(f"🎲 Stage 5/5: สุ่มจำลองข้อมูลสังเคราะห์ {years} ปี {traces} รูปแบบ...")
-    model.generate_synthetic(n_years=years, n_traces=traces)
+    model.generate_synthetic(n_years=years, n_traces=traces, cap_multiplier=1.5)
     model.validate_imputation()
-    
     return model
 
 if uploaded_file and st.button("🚀 รันโมเดล"):
@@ -72,44 +67,7 @@ if uploaded_file and st.button("🚀 รันโมเดล"):
 if st.session_state.model_run_complete:
     model = st.session_state.model_result
     
-    st.subheader(f"📈 ข้อมูล{data_type}สังเคราะห์ (Trace 001)")
-    st.line_chart(model.synthetic_traces["trace_001"])
-    
-    csv_data = model.synthetic_traces["trace_001"].to_csv().encode('utf-8')
-    st.download_button(
-        label="📥 ดาวน์โหลดข้อมูล (CSV)",
-        data=csv_data,
-        file_name="synthetic_trace_001.csv",
-        mime="text/csv"
-    )
-    
-    st.subheader("📊 สถิติเชิงพรรณนา")
-    st.dataframe(model.synthetic_traces["trace_001"].describe())
-
-    st.subheader("⚖️ Double Mass Analysis")
-    st.write("ตรวจสอบความสม่ำเสมอของข้อมูล (Consistency) เทียบกับค่าเฉลี่ยสถานีรอบข้าง")
-    
-    target_station = st.selectbox("เลือกสถานีที่ต้องการตรวจสอบ:", model.stations)
-    if target_station:
-        base_stations = [s for s in model.stations if s != target_station]
-        target_cumsum = model.filled_data[target_station].cumsum()
-        base_avg = model.filled_data[base_stations].mean(axis=1)
-        base_cumsum = base_avg.cumsum()
-        
-        plot_type = "Streamflow" if "น้ำท่า" in data_type else "Rainfall"
-            
-        fig, ax = plt.subplots(figsize=(8, 6))
-        ax.plot(base_cumsum, target_cumsum, marker='o', markersize=4, linestyle='-', color='#1f77b4', label='Double Mass Curve')
-        ax.set_title(f"{target_station} vs Average of {len(base_stations)} Base Stations", fontsize=12)
-        ax.set_xlabel("Cumulative Mean of Base Stations")
-        ax.set_ylabel(f"Cumulative {plot_type} at {target_station}")
-        ax.grid(True, linestyle='--', alpha=0.6)
-        ax.legend()
-        st.pyplot(fig)
-     
-    st.divider()
-    st.subheader("🏆 คัดเลือก Trace ที่เหมาะสมที่สุด (Best Representative Trace)")
-    
+    # คำนวณหา Best Trace ขึ้นมาก่อนเลย
     historical_mean = model.filled_data.mean().mean() 
     best_trace_name = None
     min_diff = float('inf')
@@ -121,25 +79,65 @@ if st.session_state.model_run_complete:
             min_diff = diff
             best_trace_name = trace_name
             
-    st.success(f"✨ โปรแกรมคัดเลือก **{best_trace_name}** มาให้แล้วจ้ะ!")
-    st.write(f"เหตุผลเบื้องต้น: มีค่าเฉลี่ยปริมาณ{data_type}ใกล้เคียงกับข้อมูลในอดีตมากที่สุด")
+    plot_type_th = "น้ำท่า" if "น้ำท่า" in data_type else "น้ำฝน"
+    plot_type_en = "Streamflow" if "น้ำท่า" in data_type else "Rainfall"
+
+    st.subheader(f"📈 ข้อมูล{plot_type_th}สังเคราะห์ ({best_trace_name} - ตัวแทนที่ดีที่สุด)")
+    st.line_chart(model.synthetic_traces[best_trace_name])
     
-    # 1. ย้ายปุ่มดาวน์โหลดออกมาวางข้างนอก เพื่อไม่ให้ Streamlit รวน
+    st.subheader(f"📊 สถิติเชิงพรรณนา ({best_trace_name})")
+    st.dataframe(model.synthetic_traces[best_trace_name].describe())
+
+    st.subheader("⚖️ Double Mass Analysis")
+    st.write("ตรวจสอบความสม่ำเสมอของข้อมูล (Consistency) เทียบกับค่าเฉลี่ยสถานีรอบข้าง")
+    
+    target_station = st.selectbox("เลือกสถานีที่ต้องการตรวจสอบ:", model.stations)
+    
+    if target_station:
+        base_stations = [s for s in model.stations if s != target_station]
+        target_cumsum = model.filled_data[target_station].cumsum()
+        base_avg = model.filled_data[base_stations].mean(axis=1)
+        base_cumsum = base_avg.cumsum()
+        
+        fig, ax = plt.subplots(figsize=(8, 6))
+        ax.plot(base_cumsum, target_cumsum, marker='o', markersize=4, linestyle='-', color='#1f77b4', label='Double Mass Curve')
+        ax.set_title(f"{target_station} vs Average of {len(base_stations)} Base Stations", fontsize=12)
+        ax.set_xlabel("Cumulative Mean of Base Stations")
+        ax.set_ylabel(f"Cumulative {plot_type_en} at {target_station}")
+        ax.grid(True, linestyle='--', alpha=0.6)
+        ax.legend()
+        st.pyplot(fig)
+
+    st.divider()
+    st.subheader("🏆 จัดการข้อมูล Trace ที่เหมาะสมที่สุด")
+    st.success(f"✨ โปรแกรมคัดเลือก **{best_trace_name}** มาให้เรียบร้อยแล้วจ้ะ!")
+    st.write(f"เหตุผลเบื้องต้น: มีค่าเฉลี่ยรวมใกล้เคียงกับข้อมูล{plot_type_th}ในอดีตมากที่สุด")
+    
     csv_best = model.synthetic_traces[best_trace_name].to_csv().encode('utf-8')
     st.download_button(
-        label=f"📥 ดาวน์โหลดเฉพาะ {best_trace_name} ไปใช้งาน (CSV)",
+        label=f"📥 ดาวน์โหลด {best_trace_name} ไปใช้งาน (CSV)",
         data=csv_best,
         file_name=f"best_{best_trace_name}.csv",
         mime="text/csv"
     )
     
-    # 2. ปุ่มให้ WARI วิเคราะห์ผลแยกไว้ต่างหาก
     if api_key:
         if st.button(f"🧠 ให้ WARI สรุปเหตุผลเจาะลึกของ {best_trace_name}"):
             with st.spinner("WARI กำลังเรียบเรียงเหตุผลให้นะคะ..."):
                 try:
                     best_trace_stats = model.synthetic_traces[best_trace_name].describe().to_string()
-                    # (ใส่โค้ด Prompt พิมพ์ prompt = f"""...""" และโค้ดเรียก AI เหมือนเดิมเลยจ้ะ)
+                    
+                    prompt = f"""
+                    คุณคือ WARI เพศหญิง ผู้ช่วยวิศวกรและนักอุทกวิทยา 
+                    โปรแกรมได้จำลองข้อมูลและคัดเลือก '{best_trace_name}' เป็นตัวแทนที่ดีที่สุด เนื่องจากมีค่าเฉลี่ยรวมใกล้เคียงกับข้อมูล{data_type}ในอดีตมากที่สุด
+                    
+                    ช่วยเขียนสรุปสั้นๆ (ไม่เกิน 3-4 ย่อหน้า) ด้วยภาษาทางการแต่น่าอ่าน สำหรับนำไปใช้เขียนรายงานหรือเล่มวิทยานิพนธ์ โดยครอบคลุมประเด็น:
+                    1. ทำไมการเลือก Trace ที่มีคุณสมบัติทางสถิติใกล้เคียงอดีตที่สุด จึงเหมาะสมต่อการนำไปใช้งาน
+                    2. วิเคราะห์แนวโน้มจากค่าสถิติของ Trace นี้ (อ้างอิงจากตารางด้านล่าง) ว่ามีจุดไหนที่ควรระวังบ้าง โดยพิจารณาบริบทของข้อมูลประเภท '{data_type}'
+                    
+                    ตารางสถิติ:
+                    {best_trace_stats}
+                    """
                     
                     genai.configure(api_key=api_key)
                     model_ai = genai.GenerativeModel("gemini-3.5-flash")
