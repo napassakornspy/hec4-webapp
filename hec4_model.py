@@ -179,7 +179,7 @@ class HEC4:
             self.A[m] = A; self.B[m] = B
         return self
 
-    def generate_synthetic(self, n_years=50, n_traces=1, seed=None, cap_multiplier=1.5):
+    def generate_synthetic(self, n_years=50, n_traces=1, seed=None, cap_multiplier=2.0):
         rng = np.random.default_rng(seed)
         warmup = 24
         self.synthetic_traces = {}
