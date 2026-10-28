@@ -184,6 +184,7 @@ class HEC4:
         warmup = 24
         self.synthetic_traces = {}
         
+        # ดึงค่าสูงสุดจากข้อมูลอดีตมาเป็นเพดาน
         max_limits = self.filled_data.max().values * cap_multiplier
         
         for tr in range(1, n_traces + 1):
@@ -196,8 +197,17 @@ class HEC4:
                 log_Q = [self.monthly_stats[self.stations[i]][m]["mean_log"] + 
                          self.monthly_stats[self.stations[i]][m]["std_log"] * Z[i] for i in range(self.n_stations)]
                 
+                # แปลงค่ากลับจาก Log-space
                 Q_raw = np.exp(log_Q) - self.epsilon
+                
+                # ตัดยอดตั้งต้นไม่ให้เกินเพดาน
                 Q_capped = np.clip(Q_raw, 0.0, max_limits)
+                
+                # เพิ่ม Noise สุ่มลดค่าลง 1-5% เฉพาะจุดที่ไปชนเพดาน
+                hit_cap = Q_raw >= max_limits
+                if np.any(hit_cap):
+                    noise = max_limits * rng.uniform(0.01, 0.05, size=self.n_stations)
+                    Q_capped = np.where(hit_cap, max_limits - noise, Q_capped)
                 
                 records.append(Q_capped)
                 Z_prev = Z
