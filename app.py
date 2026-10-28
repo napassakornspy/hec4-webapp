@@ -54,7 +54,7 @@ def run_hec4_pipeline(file_buffer, years, traces, missing, _status_box):
     model.compute_correlation_matrices()
     model.compute_generation_matrices()
     _status_box.info(f"🎲 Stage 5/5: สุ่มจำลองข้อมูลสังเคราะห์ {years} ปี {traces} รูปแบบ...")
-    model.generate_synthetic(n_years=years, n_traces=traces, cap_multiplier=1.5)
+    model.generate_synthetic(n_years=years, n_traces=traces, cap_multiplier=2.0)
     model.validate_imputation()
     return model
 
